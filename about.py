@@ -9,7 +9,7 @@ st.caption("This application enables organizations to efficiently estimate the g
 st.write("""
            The original emissions calculation methodology through an excel based tool was publicly shared by **Misha**, and forms the core logic for this tool. Emissions are calculated based on great-circle distances between airports and travel class-specific emission factors from DEFRA — the UK Government’s 2024 conversion factors, a globally recognized standard. The methodology aligns with Scope 3, Category 6 (Business Travel) reporting requirements under frameworks like AASB S2, IFRS S2, California SB 253, and the EU CSRD.
          
-**Original Methodology Contributor**: [Misha Cajic](https://www.linkedin.com/in/mishacajic/)  
+**Original Methodology Contributor**: [Misha Cajic](https://www.linkedin.com/in/misha-cajic/)  
          
 ---
          
