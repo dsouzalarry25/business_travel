@@ -17,7 +17,8 @@ sample_csv = sample_df.to_csv(index=False, encoding="utf-8-sig")
 template = pd.DataFrame(columns=["Origin", "Destination", "Class", "Num Passengers", "Return?"])
 template_csv = template.to_csv(index=False, encoding="utf-8-sig")
 
-from data import airports, emission_factors
+airports = st.session_state.airports
+emission_factors = st.session_state.emission_factors
 def get_coordinate(origin, destination):
     try:
         airports_indexed = airports.set_index('Lookup')
