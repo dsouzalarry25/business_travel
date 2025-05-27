@@ -3,74 +3,59 @@ from pathlib import Path
 import pandas as pd
 from ui.layout import set_page_config
 import math
-from data import airports
-from data import emission_factors
+from data import airports, emission_factors
 import altair as alt
 
+set_page_config()
+
 avarni_file_path = Path(__file__).parent / "data" / "Avarni_Flight-Distance-Emissions-Calculator.xlsm"
-template_data = pd.read_excel(avarni_file_path, sheet_name="Flight Calculation Sheet", header=2, index_col=1, usecols="A:E")
-template_csv = template_data.to_csv()
+# template_data = pd.read_excel(avarni_file_path, sheet_name="Flight Calculation Sheet", header=2, index_col=1, usecols="A:E")
+# template_csv = template_data.to_csv(encoding="utf-8")
+
+template = pd.DataFrame(columns=["Origin", "Destination", "Class", "Num Passengers", "Return?"])
+template_csv = template.to_csv(index=False, encoding="utf-8-sig")
+
 
 def get_coordinate(origin, destination):
-    airports_indexed = airports.set_index('Lookup')
     try:
-        origin_lat = airports_indexed.at[origin, 'Lat']
-        origin_lon = airports_indexed.at[origin, 'Lon']
-        dest_lat = airports_indexed.at[destination, 'Lat']
-        dest_lon = airports_indexed.at[destination, 'Lon']
-    except KeyError:
-        st.error(f"Airport code not found: {origin} or {destination}")
+        airports_indexed = airports.set_index('Lookup')
+        origin_row = airports_indexed.loc[[origin]] if origin in airports_indexed.index else None
+        dest_row = airports_indexed.loc[[destination]] if destination in airports_indexed.index else None
+
+        if origin_row is None or dest_row is None:
+            st.error(f"Airport code not found: {origin} or {destination}")
+            return None, None, None, None
+
+        origin_lat = origin_row["Lat"].values[0]
+        origin_lon = origin_row["Lon"].values[0]
+        dest_lat = dest_row["Lat"].values[0]
+        dest_lon = dest_row["Lon"].values[0]
+
+        return origin_lat, origin_lon, dest_lat, dest_lon
+    except Exception as e:
+        st.error(f"Error getting coordinates for {origin} → {destination}: {e}")
         return None, None, None, None
-    return origin_lat, origin_lon, dest_lat, dest_lon
+
+
 
 def get_emission_factor(fly_class):
     emission_factors_indexed = emission_factors.set_index("Class")
     try:
-        emission_factor = emission_factors_indexed.at[fly_class, "Factor CO2e Value"]
+        return emission_factors_indexed.at[fly_class, "Factor CO2e Value"]
     except KeyError:
-        st.error(f"Invalid class selected {fly_class}")
+        st.error(f"Invalid class selected: {fly_class}")
         return None
-    return emission_factor
+
 
 def calculate_distance(origin_lat, origin_lon, dest_lat, dest_lon, is_return=False):
-    """
-    Calculate the great-circle distance between two points on the Earth
-    specified by latitude and longitude using the Haversine formula.
-
-    Parameters:
-        origin_lat (float): Latitude of the origin point in degrees
-        origin_lon (float): Longitude of the origin point in degrees
-        dest_lat (float): Latitude of the destination point in degrees
-        dest_lon (float): Longitude of the destination point in degrees
-        is_return (bool): If True, multiply the distance by 2 (return trip)
-
-    Returns:
-        float: Distance between the two points in kilometers
-    """
-    R = 6371  # Earth's radius in kilometers
-
-    # Convert degrees to radians
-    origin_lat = math.radians(origin_lat)
-    origin_lon = math.radians(origin_lon)
-    dest_lat = math.radians(dest_lat)
-    dest_lon = math.radians(dest_lon)
-
-    # Differences
+    R = 6371  # Radius of Earth in kilometers
+    origin_lat, origin_lon, dest_lat, dest_lon = map(math.radians, [origin_lat, origin_lon, dest_lat, dest_lon])
     d_lat = dest_lat - origin_lat
     d_lon = dest_lon - origin_lon
-
-    # Haversine formula
     a = math.sin(d_lat / 2)**2 + math.cos(origin_lat) * math.cos(dest_lat) * math.sin(d_lon / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
     distance = R * c
-
-    if is_return:
-        distance *= 2
-
-    return distance
-
-
+    return distance * 2 if is_return else distance
 
 
 tab1, tab2 = st.tabs(["Upload Data", "Visualize Emissions"])
@@ -78,138 +63,177 @@ tab1, tab2 = st.tabs(["Upload Data", "Visualize Emissions"])
 with tab1:
     st.header("Upload Data")
     st.caption("Use the template to fill in your data. The template is prefilled with some data already as an example.")
-    st.download_button(label="Download template", data=template_csv, file_name="business_travel_template.csv", type="primary", icon=":material/download:")
-
-
+    st.download_button(
+        label="Download template",
+        data=template_csv,
+        file_name="business_travel_template.csv",
+        type="primary",
+        icon=":material/download:"
+    )
+    
     uploaded_files = st.file_uploader(
-        label="Upload your business activity file here. Make sure you fill the **Origin** and **Destination** columns with values that are valid. Use the values given in the '**Lookup**' column in the '**Background data** > **Airports**' page",
+        label="Upload your business activity file here",
         type="csv",
         accept_multiple_files=True,
-        help="You can upload multiple files, and the app will merge them by aligning columns with the same names. Please ensure your files use the exact column names as in the template. It's perfectly fine to include additional columns with tagging information to enable deeper analysis of your emissions later on."
+        help="You can upload multiple files. Make sure columns match the template. Extra columns for tags are fine."
     )
 
-
     if uploaded_files:
-        if len(uploaded_files) > 1:
-            business_data = []
+        with st.spinner("Please wait while the calculation is running"):
+            st.session_state["files"] = uploaded_files
+            dataframes = []
             for file in uploaded_files:
                 try:
                     file.seek(0)
                     df = pd.read_csv(file, encoding="utf-8")
-                    df['filename'] = file.name  # Add filename column here
-                    business_data.append(df)
-                    with st.expander(file.name, icon=":material/description:"):
-                        st.dataframe(df)  # Show the single dataframe for this file here
+                except UnicodeDecodeError:
+                    file.seek(0)
+                    df = pd.read_csv(file, encoding="latin1")  # fallback for Excel-exported files
                 except Exception as e:
-                    st.error(f"Error occurred when trying to read the CSV file '{file.name}': {e}")
+                    st.error(f"Could not read {file.name}: {e}")
+                    continue  # skip this file
+                
+                df['filename'] = file.name  # optional: keep track of which file data came from
+                dataframes.append(df)
+                
+                with st.expander(file.name, icon=":material/description:"):
+                    st.dataframe(df)
 
-            if business_data:
-                business_data = pd.concat(business_data, ignore_index=True)
-                with st.expander("**Merged data**", icon=":material/database_upload:"):
-                    st.dataframe(business_data)
+            if dataframes:
+                business_data = pd.concat(dataframes, ignore_index=True)
 
-        else:
-            # Single file uploaded, read the first file in the list
-            file = uploaded_files[0]
-            try:
-                file.seek(0)
-                business_data = pd.read_csv(file, encoding="utf-8")
-                with st.expander(file.name, icon=":material/database_upload:"):
-                    st.dataframe(business_data)
-            except Exception as e:
-                st.error(f"Error occurred when trying to read the CSV file '{file.name}': {e}")
+                distances = []
+                emission_factors_list = []
+                emissions = []
+
+                for _, row in business_data.iterrows():
+                    origin = row["Origin"]
+                    destination = row["Destination"]
+                    fly_class = row["Class"]
+                    num_passengers = row.get("Num Passengers", 1)
+                    is_return = (row.get("Return?") == "Return")
+
+                    origin_lat, origin_lon, dest_lat, dest_lon = get_coordinate(origin, destination)
+                    emission_factor = get_emission_factor(fly_class)
+
+                    if all(val is not None and not pd.isna(val) for val in [origin_lat, origin_lon, dest_lat, dest_lon, emission_factor]):
+                        dist = calculate_distance(origin_lat, origin_lon, dest_lat, dest_lon, is_return=is_return)
+                        pkm = dist * num_passengers
+                        emission = pkm * emission_factor
+
+                        distances.append(dist)
+                        emission_factors_list.append(emission_factor)
+                        emissions.append(emission)
+                    else:
+                        distances.append(None)
+                        emission_factors_list.append(None)
+                        emissions.append(None)
+
+                # ---- Merge additional airport + emissions metadata ----
+
+                # Airports
+                airports_origin = airports.rename(columns=lambda x: f"Origin_{x}")
+                airports_dest = airports.rename(columns=lambda x: f"Destination_{x}")
+
+                # Emission Factors
+                ef_renamed = emission_factors.rename(columns=lambda x: f"EF_{x}")
+                business_data = business_data.merge(
+                    ef_renamed,
+                    left_on="Class",
+                    right_on="EF_Class",
+                    how="left"
+                )
+
+                business_data['Distance_km'] = distances
+                business_data["Passenger_distance_pkm"] = business_data['Distance_km'] * business_data['Num Passengers']
+                business_data["Emissions"] = emissions
+
+                st.subheader("Processed Data")
+                st.caption(f"{len(business_data)} data rows loaded (excluding the header row)")
+                st.dataframe(business_data)
+                st.session_state["business_data"] = business_data
 
 
-        distances = []
-        emission_factors_list = []
-        emissions = []
-
-        for _, row in business_data.iterrows():
-            origin = row["Origin"]
-            destination = row["Destination"]
-            fly_class = row["Class"]
-            
-            origin_lat, origin_lon, dest_lat, dest_lon = get_coordinate(origin, destination)
-            emission_factor = get_emission_factor(fly_class)
-            
-            is_return = (row.get("Return?") == "Return")
-
-            dist = calculate_distance(origin_lat, origin_lon, dest_lat, dest_lon, is_return=is_return)
-            pkm = dist * row["Num Passengers"]
-            emission = pkm * emission_factor if emission_factor is not None else None
-
-            distances.append(dist)
-            emission_factors_list.append(emission_factor)
-
-
-        business_data['Distance_km'] = distances
-        business_data["Passenger_distance_pkm"] = business_data['Distance_km'] * business_data['Num Passengers']
-        business_data["Emission factor"] = emission_factors_list
-        business_data["Emissions"] = business_data['Passenger_distance_pkm'] * business_data['Emission factor']
-
-
-        st.write("Business data with distances:")
-        st.dataframe(business_data)
-        st.session_state["business_data"] = business_data
 
 
 with tab2:
     st.header("Dashboard")
 
-    if "business_data" in st.session_state:
+    if "business_data" in st.session_state and st.session_state["business_data"] is not None:
         df = st.session_state["business_data"]
 
         st.subheader("Summary Statistics")
-        st.metric("Total Emissions (kg CO₂e)", f"{df['Emissions'].sum():,.2f}")
-        st.metric("Total Distance (km)", f"{df['Distance_km'].sum():,.2f}")
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([0.1,0.1, 0.1])
+            with col1:
+                st.metric("Total Emissions (kg CO₂e)", f"{df['Emissions'].sum():,.2f}")
+            with col2:
+                st.metric("Total Distance (km)", f"{df['Distance_km'].sum():,.2f}")
+            with col3:
+                st.metric("Total Passenger Distance (pkm)", f"{df['Passenger_distance_pkm'].sum():,.2f}")
 
-        st.subheader("Emissions by Travel Class (Bar Chart)")
-        st.bar_chart(df.groupby("Class")["Emissions"].sum())
 
-        st.subheader("Emissions by Route (Top 10)")
-        df["Route"] = df["Origin"] + " ➝ " + df["Destination"]
-        st.bar_chart(df.groupby("Route")["Emissions"].sum().sort_values(ascending=False).head(10))
+        col1, col2 = st.columns([0.1,0.1])    
+        with col1:
+            """#### Emissions by Class (Pie Chart)"""
+            pie_data = df.groupby("Class")["Emissions"].sum().reset_index()
+            pie_chart = alt.Chart(pie_data).mark_arc(innerRadius=40).encode(
+                theta=alt.Theta(field="Emissions", type="quantitative"),
+                color=alt.Color(field="Class", type="nominal"),
+                tooltip=["Class", "Emissions"]
+                )
+            st.altair_chart(pie_chart, use_container_width=True)
+        
+        
+        with col2:
+            """#### Emissions by Route (Top 10)"""
+            df["Route"] = df["Origin"] + " ➝ " + df["Destination"]
+            st.bar_chart(df.groupby("Route")["Emissions"].sum().sort_values(ascending=False).head(10))
 
-        st.subheader("Emissions by Class (Pie Chart)")
-        pie_data = df.groupby("Class")["Emissions"].sum().reset_index()
-        pie_chart = alt.Chart(pie_data).mark_arc(innerRadius=40).encode(
-            theta=alt.Theta(field="Emissions", type="quantitative"),
-            color=alt.Color(field="Class", type="nominal"),
-            tooltip=["Class", "Emissions"]
-        )
-        st.altair_chart(pie_chart, use_container_width=True)
-
-        st.subheader("Custom Visualization")
-
+        st.divider()
+        
+        """#### Custom Visualization"""
+        # Extract columns
         numeric_columns = df.select_dtypes(include=['number']).columns.tolist()
         categorical_columns = df.select_dtypes(include=['object']).columns.tolist()
 
-        x_axis = st.selectbox("Select X-axis", options=categorical_columns + numeric_columns)
-        y_axis = st.selectbox("Select Y-axis", options=numeric_columns)
+        col1, col2, col3 = st.columns([0.1,0.1,0.1])
+        with col1:
+            x_axis = st.selectbox("Select X-axis", options=categorical_columns + numeric_columns)
+        with col2:
+            y_axis = st.selectbox("Select Y-axis", options=numeric_columns)
+        with col3:
+            aggregation = st.selectbox("Aggregation Method", options=["sum", "mean", "median", "min", "max"])
 
-        chart_type = st.radio("Chart Type", ["Bar", "Line", "Scatter"])
+        chart_type = st.radio("Chart Type", ["Bar", "Line", "Scatter"], horizontal=True)
 
+        # Apply aggregation
+        if x_axis in df.columns and y_axis in df.columns:
+            agg_df = df.groupby(x_axis, dropna=False)[y_axis].agg(aggregation).reset_index()
+        else:
+            st.warning("Selected columns are not valid.")
+            st.stop()
+
+        # Build chart
         if chart_type == "Bar":
-            chart = alt.Chart(df).mark_bar().encode(
+            chart = alt.Chart(agg_df).mark_bar().encode(
                 x=alt.X(x_axis, type='ordinal' if x_axis in categorical_columns else 'quantitative'),
                 y=alt.Y(y_axis, type='quantitative'),
                 tooltip=[x_axis, y_axis]
             )
         elif chart_type == "Line":
-            chart = alt.Chart(df).mark_line().encode(
+            chart = alt.Chart(agg_df).mark_line().encode(
                 x=alt.X(x_axis, type='ordinal' if x_axis in categorical_columns else 'quantitative'),
                 y=alt.Y(y_axis, type='quantitative'),
                 tooltip=[x_axis, y_axis]
             )
-        else:  # Scatter
+        else:  # Scatter (no aggregation makes more sense here)
             chart = alt.Chart(df).mark_circle(size=60).encode(
                 x=alt.X(x_axis, type='quantitative' if x_axis in numeric_columns else 'ordinal'),
                 y=alt.Y(y_axis, type='quantitative'),
                 tooltip=[x_axis, y_axis]
             ).interactive()
-
         st.altair_chart(chart, use_container_width=True)
 
     else:
         st.warning("No data available. Please upload files in the Calculator tab first.")
-

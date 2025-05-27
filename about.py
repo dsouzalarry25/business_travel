@@ -3,18 +3,51 @@ from ui.layout import set_page_config
 
 set_page_config()
 
-st.title("Business Travel Emissions")
+st.title("🛩️ Business Travel Emissions Calculator")
 
-st.caption("""
-           This app is designed to help organisations quickly calculate the emissions associated with business flights.
+st.caption("This application enables organizations to efficiently estimate the greenhouse gas emissions associated with business air travel.")
+st.write("""
+           The original emissions calculation methodology through an excel based tool was publicly shared by **Misha**, and forms the core logic for this tool. Emissions are calculated based on great-circle distances between airports and travel class-specific emission factors from DEFRA — the UK Government’s 2024 conversion factors, a globally recognized standard. The methodology aligns with Scope 3, Category 6 (Business Travel) reporting requirements under frameworks like AASB S2, IFRS S2, California SB 253, and the EU CSRD.
+         
+**Original Methodology Contributor**: [Misha Cajic](https://www.linkedin.com/in/mishacajic/)  
+         
+---
+         
+This streamlit implementation by **Larry** builds on that foundation, expanding the user interface and adding features like multi-file upload and emissions visualization.
+         
+**Webapp Developer**: [Larry Dsouza](https://larry-dsouza.framer.website/)
+           
+--- 
+        """)
 
-It takes an origin and a destination as inputs for each flight, as well as the class travelled and number of passengers, and automatically calculates the distance in kilometers between the origin and destination. The class is then used to determine the appropriate emissions factor to use from the 2024 DEFRA conversion factor database published by the UK Government, the de-facto standard database used worldwide for flight emission calculations. You can view the source of the emission factors by following the Factor Source Links in the Emission Factors tab under Data page.
+"""#### How to Use the Business Travel Emissions Calculator"""
 
-The calculations in this workbook can be used to fulfil the reporting requirements for Scope 3 Category 6: Business Travel, under many reporting frameworks worldwide (AASB S2, IFRS S2, CA SB 253, CSRD).
-""")
+with st.expander("View tool instructions"):
+    st.markdown("""
+    
 
-"""
-**Data provider**: Avarni, Sydney, Australia
+    ##### 1. **Prepare Your Flight Data**  
+    Export your business travel data from your expense or travel booking system. Make sure each row includes at least:
+    - ***Origin*** and ***Destination*** (IATA code like `SYD` or city name like `Sydney`)
+        - Use the accepted values available in the **Lookup** column given in this app under **Background data** > **Airports** table
+    - ***Travel class*** (`Economy`, `Business`, etc.)
+        - Use the accepted values available in the **Class** column given in this app under **Background data** > **Emission Factors** table
+        - If travel class is unknown, enter `Average`
+    - ***Number of passengers*** per booking
+        - For individual trips, enter `1` under **Num Passengers**
+    - ***Return trip?*** (optional)
+        - If the booking includes a return flight, add a `Return?` column with the value `Return` for that row. If omitted, the app assumes one-way travel.
 
-**App developer**: Larry Dsouza, Germany
-"""
+    ##### 2. **Upload and Calculate**  
+    Drag and drop your cleaned file into the app under **Calculation** > **Upload Data** tab. The calculator will:
+    - Match origin and destination to known airport locations
+    - Compute great-circle distances
+    - Apply DEFRA 2024 emission factors by class and distance
+    - Output emissions in kilograms of CO₂e
+
+    ##### 3. **Explore Emissions Results**  
+    Use the interactive dashboard to:
+    - View emissions by class and top routes
+    - Filter, sort, and visualize data
+    - Export results if needed
+    """)
