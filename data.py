@@ -1,10 +1,7 @@
 import streamlit as st
 from pathlib import Path
 import pandas as pd
-from ui.layout import set_page_config
 from utils.tables import table
-
-set_page_config()
 
 avarni_file_path = Path(__file__).parent / "data" / "Avarni_Flight-Distance-Emissions-Calculator.xlsm"
 

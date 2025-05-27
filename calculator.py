@@ -1,21 +1,21 @@
 import streamlit as st
 from pathlib import Path
 import pandas as pd
-from ui.layout import set_page_config
 import math
-from data import airports, emission_factors
 import altair as alt
 
-set_page_config()
 
 avarni_file_path = Path(__file__).parent / "data" / "Avarni_Flight-Distance-Emissions-Calculator.xlsm"
 # template_data = pd.read_excel(avarni_file_path, sheet_name="Flight Calculation Sheet", header=2, index_col=1, usecols="A:E")
 # template_csv = template_data.to_csv(encoding="utf-8")
+sample_data = Path(__file__).parent / "data" / "sample data.csv"
+sample_df = pd.read_csv(sample_data)
+sample_csv = sample_df.to_csv(index=False, encoding="utf-8-sig")
 
 template = pd.DataFrame(columns=["Origin", "Destination", "Class", "Num Passengers", "Return?"])
 template_csv = template.to_csv(index=False, encoding="utf-8-sig")
 
-
+from data import airports, emission_factors
 def get_coordinate(origin, destination):
     try:
         airports_indexed = airports.set_index('Lookup')
@@ -64,13 +64,14 @@ with tab1:
     st.header("Upload Data")
     st.caption("Use the template to fill in your data. The template is prefilled with some data already as an example.")
     st.download_button(
-        label="Download template",
+        label="Template",
         data=template_csv,
         file_name="business_travel_template.csv",
         type="primary",
         icon=":material/download:"
     )
-    
+    st.download_button("Sample data", sample_csv, file_name="sample data.csv", type="tertiary", icon=":material/download:")
+
     uploaded_files = st.file_uploader(
         label="Upload your business activity file here",
         type="csv",
@@ -236,4 +237,4 @@ with tab2:
         st.altair_chart(chart, use_container_width=True)
 
     else:
-        st.warning("No data available. Please upload files in the Calculator tab first.")
+        st.warning("No data available. Please upload files in the **Upload Data** tab first.")

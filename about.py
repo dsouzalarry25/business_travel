@@ -1,7 +1,4 @@
 import streamlit as st
-from ui.layout import set_page_config
-
-set_page_config()
 
 st.title("🛩️ Business Travel Emissions Calculator")
 

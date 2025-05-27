@@ -1,4 +1,7 @@
 import streamlit as st
+from ui.layout import set_page_config
+
+set_page_config()
 
 pages =[
     st.Page("about.py", title="About", icon=":material/info:"),
