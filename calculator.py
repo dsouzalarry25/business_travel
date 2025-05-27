@@ -3,6 +3,8 @@ from pathlib import Path
 import pandas as pd
 import math
 import altair as alt
+import plotly.graph_objects as go
+import numpy as np
 
 
 avarni_file_path = Path(__file__).parent / "data" / "Avarni_Flight-Distance-Emissions-Calculator.xlsm"
@@ -148,6 +150,11 @@ with tab1:
                 business_data['Distance_km'] = distances
                 business_data["Passenger_distance_pkm"] = business_data['Distance_km'] * business_data['Num Passengers']
                 business_data["Emissions"] = emissions
+                business_data["Origin_Lat"] = business_data.apply(lambda row: get_coordinate(row["Origin"], row["Destination"])[0], axis=1)
+                business_data["Origin_Lon"] = business_data.apply(lambda row: get_coordinate(row["Origin"], row["Destination"])[1], axis=1)
+                business_data["Destination_Lat"] = business_data.apply(lambda row: get_coordinate(row["Origin"], row["Destination"])[2], axis=1)
+                business_data["Destination_Lon"] = business_data.apply(lambda row: get_coordinate(row["Origin"], row["Destination"])[3], axis=1)
+
 
                 st.subheader("Processed Data")
                 st.caption(f"{len(business_data)} data rows loaded (excluding the header row)")
@@ -236,5 +243,71 @@ with tab2:
             ).interactive()
         st.altair_chart(chart, use_container_width=True)
 
+        st.divider()
+        st.subheader("Emissions Trail Map by flight path")
+
+        # Prepare cleaned data
+        map_df = df.dropna(subset=["Origin_Lat", "Origin_Lon", "Destination_Lat", "Destination_Lon", "Emissions"]).copy()
+
+        # Normalize emissions for line width scaling (optional)
+        emissions_norm = (map_df["Emissions"] - map_df["Emissions"].min()) / (map_df["Emissions"].max() - map_df["Emissions"].min())
+        map_df["Line_Width"] = emissions_norm * 5 + 1  # line width between 1–6
+
+        # Initialize figure
+        fig = go.Figure()
+
+        # Add each flight route as a curved great circle line
+        for _, row in map_df.iterrows():
+            lat1, lon1 = row["Origin_Lat"], row["Origin_Lon"]
+            lat2, lon2 = row["Destination_Lat"], row["Destination_Lon"]
+
+            # interpolate lat/lon points along great circle
+            num_points = 20
+            lats = np.linspace(lat1, lat2, num_points)
+            lons = np.linspace(lon1, lon2, num_points)
+
+            fig.add_trace(go.Scattermapbox(
+                mode="lines",
+                lon=lons,
+                lat=lats,
+                line=dict(width=row["Line_Width"], color="red"),
+                hoverinfo="text",
+                text=f"{row['Origin']} ➝ {row['Destination']}<br>{row['Emissions']:.2f} kg CO₂e",
+                name=""
+            ))
+
+        # Add airport bubbles (optional)
+        bubble_df = pd.concat([
+            map_df[["Origin", "Origin_Lat", "Origin_Lon"]].rename(columns={"Origin": "Airport", "Origin_Lat": "Lat", "Origin_Lon": "Lon"}),
+            map_df[["Destination", "Destination_Lat", "Destination_Lon"]].rename(columns={"Destination": "Airport", "Destination_Lat": "Lat", "Destination_Lon": "Lon"})
+        ])
+        bubble_df = bubble_df.drop_duplicates()
+
+        fig.add_trace(go.Scattermapbox(
+            mode="markers",
+            lat=bubble_df["Lat"],
+            lon=bubble_df["Lon"],
+            marker=dict(size=6, color="blue"),
+            text=bubble_df["Airport"],
+            hoverinfo="text",
+            name="Airports"
+        ))
+
+        # Layout with modern basemap
+        fig.update_layout(
+            mapbox=dict(
+                style="carto-positron",
+                zoom=1.3,
+                center={"lat": map_df["Origin_Lat"].mean(), "lon": map_df["Origin_Lon"].mean()},
+            ),
+            margin={"r": 0, "t": 0, "l": 0, "b": 0},
+            height=600,
+            showlegend=False
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
     else:
         st.warning("No data available. Please upload files in the **Upload Data** tab first.")
+
+    
