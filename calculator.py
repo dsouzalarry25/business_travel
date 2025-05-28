@@ -8,6 +8,9 @@ import numpy as np
 
 
 avarni_file_path = Path(__file__).parent / "data" / "Avarni_Flight-Distance-Emissions-Calculator.xlsm"
+
+airports = pd.read_excel(avarni_file_path, sheet_name="Airports")
+emission_factors = pd.read_excel(avarni_file_path, sheet_name="Emission Factors", header=2)
 # template_data = pd.read_excel(avarni_file_path, sheet_name="Flight Calculation Sheet", header=2, index_col=1, usecols="A:E")
 # template_csv = template_data.to_csv(encoding="utf-8")
 sample_data = Path(__file__).parent / "data" / "sample data.csv"
@@ -17,8 +20,6 @@ sample_csv = sample_df.to_csv(index=False, encoding="utf-8-sig")
 template = pd.DataFrame(columns=["Origin", "Destination", "Class", "Num Passengers", "Return?"])
 template_csv = template.to_csv(index=False, encoding="utf-8-sig")
 
-airports = st.session_state.airports
-emission_factors = st.session_state.emission_factors
 def get_coordinate(origin, destination):
     try:
         airports_indexed = airports.set_index('Lookup')
@@ -267,7 +268,7 @@ with tab2:
             lats = np.linspace(lat1, lat2, num_points)
             lons = np.linspace(lon1, lon2, num_points)
 
-            fig.add_trace(go.Scattermapbox(
+            fig.add_trace(go.Scattermap(
                 mode="lines",
                 lon=lons,
                 lat=lats,
@@ -284,7 +285,7 @@ with tab2:
         ])
         bubble_df = bubble_df.drop_duplicates()
 
-        fig.add_trace(go.Scattermapbox(
+        fig.add_trace(go.Scattermap(
             mode="markers",
             lat=bubble_df["Lat"],
             lon=bubble_df["Lon"],

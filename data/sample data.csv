@@ -1,44 +1,44 @@
-Destination,Origin,Class,Num Passengers,Return?
-AAA,AAA,Economy,4.964839906,Return
-AAA,AAB,Premium Economy,8.35521073,Return
-AAA,AAC,Average,4.622118072,One-Way
-AAA,AAE,Business,8.37426049,
-AAA,AAF,Economy,1.714998829,
-AAA,AAG,Premium Economy,9.501224595,Return
-AAA,AAH,Economy,6.368713719,One-Way
-AAA,AAI,Premium Economy,5.945962973,
-AAA,AAJ,Average,6.629131832,
-AAA,AAK,Business,1.43734818,Return
-ZUC,AAV,Economy,1.82093062,One-Way
-AAQ,AAW,Premium Economy,7.002784455,One-Way
-AAQ,AAX,Average,9.312701712,Return
-AAQ,AAY,Business,1.523922045,Return
-AAQ,AAZ,Economy,6.843595923,Return
-AAQ,ABA,Premium Economy,9.498915789,One-Way
-AAQ,ABB,Economy,8.781127743,One-Way
-AAQ,ABC,Economy,7.131331868,One-Way
-AAQ,ABD,Premium Economy,8.562700266,One-Way
-Zamboanga City,ABJ,Average,8.351693769,One-Way
-Zamboanga City,ABK,Business,9.229274619,One-Way
-Zamboanga City,ABL,Economy,3.651592097,One-Way
-Zamboanga City,ABM,Premium Economy,2.351458795,One-Way
-Zamboanga City,ABN,Economy,7.795415667,One-Way
-Zamboanga City,ABQ,Economy,9.901652623,One-Way
-Zamboanga City,ABR,Premium Economy,4.974596813,
-Zamboanga City,ABS,Average,9.204142664,
-Zamboanga City,ABT,Economy,6.13099264,
-Zamboanga City,ABU,Premium Economy,2.097390076,
-Zamboanga City,Abu Dhabi,Average,5.399536875,
-Zamboanga City,Abuja,Business,6.278340849,
-Zamboanga City,ABV,Economy,9.222518988,
-Zamboanga City,ABX,Premium Economy,1.39067868,
-Zamboanga City,ABY,Economy,5.621950529,
-ADI,ADN,Economy,7.901209175,
-ADI,ADO,Premium Economy,8.165774018,
-ADI,ADQ,Average,1.29809143,
-ADI,ADR,Business,7.929063543,
-ADI,ADS,Economy,4.399954043,
-ADN,ADT,Premium Economy,5.179559395,
-ADN,ADU,Economy,4.438578819,
-ADN,ADW,Economy,3.389916081,
-ADS,ADX,Premium Economy,6.176630652,
+Origin,Destination,Class,Num Passengers,Return?
+IXE,Sydney,Economy,4.964839906,Return
+IXE,Sydney,Premium Economy,8.35521073,Return
+IXE,Sydney,Average,4.622118072,One-Way
+IXE,Sydney,Business,8.37426049,
+IXE,Sydney,Economy,1.714998829,
+IXE,Sydney,Premium Economy,9.501224595,Return
+IXE,Sydney,Economy,6.368713719,One-Way
+AAI,Sydney,Premium Economy,5.945962973,
+AAI,Sydney,Average,6.629131832,
+AAI,Sydney,Business,1.43734818,Return
+AAI,Sydney,Economy,1.82093062,One-Way
+AAI,Sydney,Premium Economy,7.002784455,One-Way
+AAI,Sydney,Average,9.312701712,Return
+AAI,Sydney,Business,1.523922045,Return
+AAI,Sydney,Economy,6.843595923,Return
+ABA,Sydney,Premium Economy,9.498915789,One-Way
+ABB,Sydney,Economy,8.781127743,One-Way
+ABC,Sydney,Economy,7.131331868,One-Way
+ABD,Sydney,Premium Economy,8.562700266,One-Way
+ABJ,BER,Average,8.351693769,One-Way
+ABK,BER,Business,9.229274619,One-Way
+ABL,BER,Economy,3.651592097,One-Way
+ABM,BER,Premium Economy,2.351458795,One-Way
+ABN,BER,Economy,7.795415667,One-Way
+ABQ,BER,Economy,9.901652623,One-Way
+ABR,BER,Premium Economy,4.974596813,
+ABS,BER,Average,9.204142664,
+ABT,BER,Economy,6.13099264,
+ABU,BER,Premium Economy,2.097390076,
+Abu Dhabi,BER,Average,5.399536875,
+Abuja,BER,Business,6.278340849,
+ABV,BER,Economy,9.222518988,
+ABX,BER,Premium Economy,1.39067868,
+ABY,BER,Economy,5.621950529,
+ADN,BLR,Economy,7.901209175,
+ADO,BLR,Premium Economy,8.165774018,
+ADQ,BLR,Average,1.29809143,
+ADR,BLR,Business,7.929063543,
+ADS,BLR,Economy,4.399954043,
+ADT,ADN,Premium Economy,5.179559395,
+ADU,ADN,Economy,4.438578819,
+ADW,ADN,Economy,3.389916081,
+ADX,ADS,Premium Economy,6.176630652,

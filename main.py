@@ -14,6 +14,4 @@ pages =[
 pg = st.navigation(pages)
 pg.run()
 
-avarni_file_path = Path(__file__).parent / "data" / "Avarni_Flight-Distance-Emissions-Calculator.xlsm"
-st.session_state.airports = pd.read_excel(avarni_file_path, sheet_name="Airports")
-st.session_state.emission_factors = pd.read_excel(avarni_file_path, sheet_name="Emission Factors", header=2)
+
