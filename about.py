@@ -1,21 +1,46 @@
 import streamlit as st
 
-st.title("🛩️ Business Travel Emissions Calculator")
+st.title("Scope 3 Business Travel Emissions Calculator")
 
-st.caption("This application enables organizations to efficiently estimate the greenhouse gas emissions associated with business air travel.")
+
 st.write("""
-           The original emissions calculation methodology through an excel based tool was publicly shared by **Misha**, and forms the core logic for this tool. Emissions are calculated based on great-circle distances between airports and travel class-specific emission factors from DEFRA — the UK Government’s 2024 conversion factors, a globally recognized standard. The methodology aligns with Scope 3, Category 6 (Business Travel) reporting requirements under frameworks like AASB S2, IFRS S2, California SB 253, and the EU CSRD.
+#### This application enables organizations to efficiently estimate the greenhouse gas emissions associated with business air travel.
+
+---
+             
+The original emissions calculation methodology through an excel based tool was publicly shared by **Misha**, and forms the core logic for this tool. Emissions are calculated based on great-circle distances between airports and travel class-specific emission factors from DEFRA — the UK Government’s 2024 conversion factors, a globally recognized standard.
          
-**Original Methodology Contributor**: [Misha Cajic](https://www.linkedin.com/in/misha-cajic/)  
+**Original Methodology Contributor**: [Misha Cajic](https://www.linkedin.com/in/misha-cajic/) - [Avarni](https://www.avarni.co/)
          
 ---
          
 This streamlit implementation by **Larry** builds on that foundation, expanding the user interface and adding features like multi-file upload and emissions visualization.
          
 **Webapp Developer**: [Larry Dsouza](https://larry-dsouza.framer.website/)
-           
---- 
         """)
+
+with st.popover("View Larry's contributions"):
+    st.markdown("""
+- Integrated flight and emissions data from the original Excel file, including airport coordinates and class-based emission factors.
+- Built the upload feature to accept multiple CSVs, while also providing clean templates and sample files to help users get started quickly.
+- The data pipeline automatically processes user uploads and calculates emissions for each route.
+- Rewrote the core logic to calculate flight distances using the Haversine formula (great-circle distance).
+- Created an interactive dashboard that shows:
+  - Summary metrics like total emissions, distance, and passenger kilometers.
+  - Emissions by travel class and top routes.
+  - Custom charts where users can explore their data with different axes and aggregation types.
+- Built a global flight path map:
+  - Flight lines are color-coded.
+  - Line thickness represents emissions magnitude.
+  - Hover text shows flight route and emissions detail.
+- Used session state to manage data across tabs, ensuring a smooth user experience.
+- The app is structured around two main tabs: one for uploading data and one for visualizing the results.
+- Added safeguards and error messages to make sure the app handles messy or inconsistent data gracefully.
+---
+This project shows how a spreadsheet tool can evolve into a more dynamic, transparent, and shareable web application using modern Python tools like Streamlit, Plotly, and Altair.
+""")
+    
+st.divider()
 
 """#### How to Use the Business Travel Emissions Calculator"""
 
@@ -27,13 +52,13 @@ with st.expander("View tool instructions"):
     Export your business travel data from your expense or travel booking system. Make sure each row includes at least:
     - ***Origin*** and ***Destination*** (IATA code like `SYD` or city name like `Sydney`)
         - Use the accepted values available in the **Lookup** column given in this app under **Background data** > **Airports** table
-    - ***Travel class*** (`Economy`, `Business`, etc.)
+    - ***Class*** (`Economy`, `Business`, etc.)
         - Use the accepted values available in the **Class** column given in this app under **Background data** > **Emission Factors** table
         - If travel class is unknown, enter `Average`
-    - ***Number of passengers*** per booking
+    - ***Num_Passengers*** per booking
         - For individual trips, enter `1` under **Num Passengers**
-    - ***Return trip?*** (optional)
-        - If the booking includes a return flight, add a `Return?` column with the value `Return` for that row. If omitted, the app assumes one-way travel.
+    - ***Return_trip*** (optional)
+        - If the booking includes a return flight, add the value `Return` for that row. If omitted, the app assumes one-way travel.
 
     ##### 2. **Upload and Calculate**  
     Drag and drop your cleaned file into the app under **Calculation** > **Upload Data** tab. The calculator will:
