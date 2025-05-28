@@ -1,4 +1,4 @@
-Origin,Destination,Class,Num Passengers,Return?
+Origin,Destination,Class,Num_Passengers,Return_trip
 IXE,Sydney,Economy,4.964839906,Return
 IXE,Sydney,Premium Economy,8.35521073,Return
 IXE,Sydney,Average,4.622118072,One-Way
