@@ -6,24 +6,46 @@ import altair as alt
 import plotly.graph_objects as go
 import numpy as np
 import plotly.express as px
+import pydeck as pdk
 
 
 avarni_file_path = Path(__file__).parent / "data" / "Avarni_Flight-Distance-Emissions-Calculator.xlsm"
 
-airports = pd.read_excel(avarni_file_path, sheet_name="Airports")
-emission_factors = pd.read_excel(avarni_file_path, sheet_name="Emission Factors", header=2)
+@st.cache_data
+def load_airports_raw():
+    return pd.read_excel(avarni_file_path, sheet_name="Airports")
+
+airports = load_airports_raw()
+
+@st.cache_data
+def load_emission_factors_raw():
+    return pd.read_excel(avarni_file_path, sheet_name="Emission Factors")
+
+emission_factors = load_emission_factors_raw()
+
+@st.cache_data
+def load_airports():
+    return pd.read_excel(avarni_file_path, sheet_name="Airports").set_index("Lookup")
+
+airports_indexed = load_airports()
+
+@st.cache_data
+def load_emission_factors():
+    return pd.read_excel(avarni_file_path, sheet_name="Emission Factors", header=2).set_index("Class")
+
+emission_factors_indexed = load_emission_factors()
+
 # template_data = pd.read_excel(avarni_file_path, sheet_name="Flight Calculation Sheet", header=2, index_col=1, usecols="A:E")
 # template_csv = template_data.to_csv(encoding="utf-8")
 sample_data = Path(__file__).parent / "data" / "sample data.csv"
 sample_df = pd.read_csv(sample_data)
 sample_csv = sample_df.to_csv(index=False, encoding="utf-8-sig")
 
-template = pd.DataFrame(columns=["Origin", "Destination", "Class", "Num Passengers", "Return?"])
+template = pd.DataFrame(columns=["Origin", "Destination", "Class", "Num_Passengers", "Return_trip"])
 template_csv = template.to_csv(index=False, encoding="utf-8-sig")
 
 def get_coordinate(origin, destination):
     try:
-        airports_indexed = airports.set_index('Lookup')
         origin_row = airports_indexed.loc[[origin]] if origin in airports_indexed.index else None
         dest_row = airports_indexed.loc[[destination]] if destination in airports_indexed.index else None
 
@@ -42,9 +64,7 @@ def get_coordinate(origin, destination):
         return None, None, None, None
 
 
-
 def get_emission_factor(fly_class):
-    emission_factors_indexed = emission_factors.set_index("Class")
     try:
         return emission_factors_indexed.at[fly_class, "Factor CO2e Value"]
     except KeyError:
@@ -85,95 +105,99 @@ with tab1:
     )
 
     if uploaded_files:
-        with st.spinner("Please wait while the calculation is running"):
-            st.session_state["files"] = uploaded_files
-            dataframes = []
-            for file in uploaded_files:
-                try:
-                    file.seek(0)
-                    df = pd.read_csv(file, encoding="utf-8")
-                except UnicodeDecodeError:
-                    file.seek(0)
-                    df = pd.read_csv(file, encoding="latin1")  # fallback for Excel-exported files
-                except Exception as e:
-                    st.error(f"Could not read {file.name}: {e}")
-                    continue  # skip this file
-                
-                df['filename'] = file.name  # optional: keep track of which file data came from
-                dataframes.append(df)
-                
-                with st.expander(file.name, icon=":material/description:"):
-                    st.dataframe(df)
+        if st.button("Calculate emissions", type="primary"):
+            with st.spinner("Please wait while the calculation is running"):
+                st.session_state["files"] = uploaded_files
+                dataframes = []
+                for file in uploaded_files:
+                    try:
+                        file.seek(0)
+                        df = pd.read_csv(file, encoding="utf-8")
+                    except UnicodeDecodeError:
+                        file.seek(0)
+                        df = pd.read_csv(file, encoding="latin1")  # fallback for Excel-exported files
+                    except Exception as e:
+                        st.error(f"Could not read {file.name}: {e}")
+                        continue  # skip this file
+                    
+                    df['filename'] = file.name  # optional: keep track of which file data came from
+                    dataframes.append(df)
+                    
+                    with st.expander(file.name, icon=":material/description:"):
+                        st.caption(f"{len(df)} rows found)")
+                        st.dataframe(df)
 
-            if dataframes:
-                business_data = pd.concat(dataframes, ignore_index=True)
+                if dataframes:
+                    business_data = pd.concat(dataframes, ignore_index=True)
 
-                distances = []
-                emission_factors_list = []
-                emissions = []
+                    distances = []
+                    emission_factors_list = []
+                    emissions = []
+                    origin_lats = []
+                    origin_lons = []
+                    dest_lats = []
+                    dest_lons = []
 
-                for _, row in business_data.iterrows():
-                    origin = row["Origin"]
-                    destination = row["Destination"]
-                    fly_class = row["Class"]
-                    num_passengers = row.get("Num Passengers", 1)
-                    is_return = (row.get("Return?") == "Return")
+                    for row in business_data.itertuples(index=False):
+                        origin = row.Origin
+                        destination = row.Destination
+                        fly_class = row.Class
+                        row_dict = row._asdict()
+                        num_passengers = row_dict.get("Num_Passengers", 1) or row_dict.get("Num Passengers", 1)
+                        return_val = getattr(row, "Return_trip", "")
+                        is_return = str(return_val).strip().lower() == "return"
 
-                    origin_lat, origin_lon, dest_lat, dest_lon = get_coordinate(origin, destination)
-                    emission_factor = get_emission_factor(fly_class)
+                        origin_lat, origin_lon, dest_lat, dest_lon = get_coordinate(origin, destination)
+                        emission_factor = get_emission_factor(fly_class)
+                        origin_lats.append(origin_lat)
+                        origin_lons.append(origin_lon)
+                        dest_lats.append(dest_lat)
+                        dest_lons.append(dest_lon)
 
-                    if all(val is not None and not pd.isna(val) for val in [origin_lat, origin_lon, dest_lat, dest_lon, emission_factor]):
-                        dist = calculate_distance(origin_lat, origin_lon, dest_lat, dest_lon, is_return=is_return)
-                        pkm = dist * num_passengers
-                        emission = pkm * emission_factor
+                        if all(val is not None and not pd.isna(val) for val in [origin_lat, origin_lon, dest_lat, dest_lon, emission_factor]):
+                            dist = calculate_distance(origin_lat, origin_lon, dest_lat, dest_lon, is_return=is_return)
+                            pkm = dist * num_passengers
+                            emission = pkm * emission_factor
 
-                        distances.append(dist)
-                        emission_factors_list.append(emission_factor)
-                        emissions.append(emission)
-                    else:
-                        distances.append(None)
-                        emission_factors_list.append(None)
-                        emissions.append(None)
+                            distances.append(dist)
+                            emission_factors_list.append(emission_factor)
+                            emissions.append(emission)
+                        else:
+                            distances.append(None)
+                            emission_factors_list.append(None)
+                            emissions.append(None)
 
-                # ---- Merge additional airport + emissions metadata ----
+                    # ---- Merge additional airport + emissions metadata ----
 
-                # Airports
-                airports_origin = airports.rename(columns=lambda x: f"Origin_{x}")
-                airports_dest = airports.rename(columns=lambda x: f"Destination_{x}")
+                    # Airports
+                    airports_origin = airports.rename(columns=lambda x: f"Origin_{x}")
+                    airports_dest = airports.rename(columns=lambda x: f"Destination_{x}")
 
-                # Emission Factors
-                ef_renamed = emission_factors.rename(columns=lambda x: f"EF_{x}")
-                business_data = business_data.merge(
-                    ef_renamed,
-                    left_on="Class",
-                    right_on="EF_Class",
-                    how="left"
-                )
-
-                business_data['Distance_km'] = distances
-                business_data["Passenger_distance_pkm"] = business_data['Distance_km'] * business_data['Num Passengers']
-                business_data["Emissions"] = emissions
-                business_data["Origin_Lat"] = business_data.apply(lambda row: get_coordinate(row["Origin"], row["Destination"])[0], axis=1)
-                business_data["Origin_Lon"] = business_data.apply(lambda row: get_coordinate(row["Origin"], row["Destination"])[1], axis=1)
-                business_data["Destination_Lat"] = business_data.apply(lambda row: get_coordinate(row["Origin"], row["Destination"])[2], axis=1)
-                business_data["Destination_Lon"] = business_data.apply(lambda row: get_coordinate(row["Origin"], row["Destination"])[3], axis=1)
+                    # Emission Factors
+                    business_data["Emission_Factor"] = emission_factors_list
 
 
-                st.subheader("Processed Data")
-                st.caption(f"{len(business_data)} data rows loaded (excluding the header row)")
-                st.dataframe(business_data)
-                st.session_state["business_data"] = business_data
+                    business_data['Distance_km'] = distances
+                    business_data["Passenger_distance_pkm"] = business_data['Distance_km'] * business_data['Num_Passengers']
+                    business_data["Emissions"] = emissions
+                    business_data["Origin_Lat"] = origin_lats
+                    business_data["Origin_Lon"] = origin_lons
+                    business_data["Destination_Lat"] = dest_lats
+                    business_data["Destination_Lon"] = dest_lons
 
 
+                    st.subheader("Processed Data")
+                    st.caption(f"{len(business_data)} data rows loaded (excluding the header row)")
+                    st.dataframe(business_data)
+                    st.session_state["business_data"] = business_data
 
 
 with tab2:
-    st.header("Dashboard")
 
     if "business_data" in st.session_state and st.session_state["business_data"] is not None:
         df = st.session_state["business_data"]
 
-        st.subheader("Summary Statistics")
+        st.write("""#### Summary Statistics""")
         with st.container(border=True):
             col1, col2, col3 = st.columns([0.1,0.1, 0.1])
             with col1:
@@ -200,6 +224,69 @@ with tab2:
             """#### Emissions by Route (Top 10)"""
             df["Route"] = df["Origin"] + " ➝ " + df["Destination"]
             st.bar_chart(df.groupby("Route")["Emissions"].sum().sort_values(ascending=False).head(10))
+
+# Geomap for plotting flight paths
+        st.divider()
+        st.write("""#### Emissions Trail Map""")
+
+        map_df = df.dropna(subset=["Origin", "Destination", "Origin_Lat", "Origin_Lon", "Destination_Lat", "Destination_Lon", "Emissions"])
+        agg_map = map_df.groupby(
+            ["Origin", "Destination", "Origin_Lon", "Origin_Lat", "Destination_Lon", "Destination_Lat"],
+            as_index=False
+        ).agg({"Emissions": "sum"})
+
+        # Normalize emission width
+        def normalize(val):
+            min_val = agg_map["Emissions"].min()
+            max_val = agg_map["Emissions"].max()
+            return 1 + 5 * (val - min_val) / (max_val - min_val) if max_val > min_val else 2
+
+        agg_map["width"] = agg_map["Emissions"].apply(normalize)
+        agg_map["Emissions_str"] = agg_map["Emissions"].apply(lambda x: f"{x:.4f}")
+
+        # Use ArcLayer for smooth curves
+        arc_layer = pdk.Layer(
+            "ArcLayer",
+            data=agg_map,
+            get_source_position=["Origin_Lon", "Origin_Lat"],
+            get_target_position=["Destination_Lon", "Destination_Lat"],
+            get_source_color=[0, 200, 255, 80],
+            get_target_color=[255, 100, 100, 80],
+            get_width="width",
+            width_scale=1,
+            pickable=True,
+            auto_highlight=True,
+        )
+
+        # Define map center
+        view_state = pdk.ViewState(
+            latitude=agg_map["Origin_Lat"].mean(),
+            longitude=agg_map["Origin_Lon"].mean(),
+            zoom=2,
+            pitch=30,
+            bearing=0
+        )
+
+        # Tooltip styling
+        tooltip = {
+            "html": "<b>Route:</b> {Origin} ➔ {Destination}<br/><b>Emissions:</b> {Emissions_str} kg CO₂e",
+            "style": {
+                "backgroundColor": "rgba(255, 255, 255, 0.9)",
+                "color": "#333",
+                "fontSize": "12px",
+                "padding": "8px",
+                "borderRadius": "4px"
+            }
+        }
+
+
+        # Use modern mapbox style (lightweight)
+        st.pydeck_chart(pdk.Deck(
+            map_style="mapbox://styles/mapbox/light-v11",
+            layers=[arc_layer],
+            initial_view_state=view_state,
+            tooltip=tooltip
+        ))
 
         st.divider()
         
@@ -246,73 +333,7 @@ with tab2:
             ).interactive()
         st.altair_chart(chart, use_container_width=True)
 
-        st.divider()
-        st.subheader("Emissions Trail Map by flight path")
-
-        # Prepare cleaned data
-        map_df = df.dropna(subset=["Origin_Lat", "Origin_Lon", "Destination_Lat", "Destination_Lon", "Emissions"]).copy()
-
-        # Normalize emissions for line width scaling
-        emissions_norm = (map_df["Emissions"] - map_df["Emissions"].min()) / (map_df["Emissions"].max() - map_df["Emissions"].min())
-        map_df["Line_Width"] = emissions_norm * 5 + 1  # line width between 1–6
-
-        # Create a color mapping for each unique origin
-        unique_origins = map_df["Origin"].unique()
-        color_palette = px.colors.qualitative.Plotly  # You can change to Dark24, Bold, etc.
-        color_map = {origin: color_palette[i % len(color_palette)] for i, origin in enumerate(unique_origins)}
-
-        # Initialize figure
-        fig = go.Figure()
-
-        # Add each flight route with color based on origin
-        for _, row in map_df.iterrows():
-            lat1, lon1 = row["Origin_Lat"], row["Origin_Lon"]
-            lat2, lon2 = row["Destination_Lat"], row["Destination_Lon"]
-
-            # Interpolate great circle path
-            num_points = 20
-            lats = np.linspace(lat1, lat2, num_points)
-            lons = np.linspace(lon1, lon2, num_points)
-
-            fig.add_trace(go.Scattermap(
-                mode="lines",
-                lon=lons,
-                lat=lats,
-                line=dict(width=row["Line_Width"], color=color_map[row["Origin"]]),
-                hoverinfo="text",
-                text=f"{row['Origin']} ➝ {row['Destination']}<br>{row['Emissions']:.2f} kg CO₂e",
-                name=""  # Optional: could use row["Origin"] to show in legend
-            ))
-
-        # Add airport markers
-        bubble_df = pd.concat([
-            map_df[["Origin", "Origin_Lat", "Origin_Lon"]].rename(columns={"Origin": "Airport", "Origin_Lat": "Lat", "Origin_Lon": "Lon"}),
-            map_df[["Destination", "Destination_Lat", "Destination_Lon"]].rename(columns={"Destination": "Airport", "Destination_Lat": "Lat", "Destination_Lon": "Lon"})
-        ]).drop_duplicates()
-
-        fig.add_trace(go.Scattermap(
-            mode="markers",
-            lat=bubble_df["Lat"],
-            lon=bubble_df["Lon"],
-            marker=dict(size=6, color="blue"),
-            text=bubble_df["Airport"],
-            hoverinfo="text",
-            name="Airports"
-        ))
-
-        # Final map layout
-        fig.update_layout(
-            mapbox=dict(
-                style="carto-positron",
-                zoom=1.3,
-                center={"lat": map_df["Origin_Lat"].mean(), "lon": map_df["Origin_Lon"].mean()},
-            ),
-            margin={"r": 0, "t": 0, "l": 0, "b": 0},
-            height=600,
-            showlegend=False  # Change to True and set trace names if you want a legend
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
+        
 
     else:
         st.warning("No data available. Please upload files in the **Upload Data** tab first.")
