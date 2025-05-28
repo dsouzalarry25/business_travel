@@ -274,7 +274,7 @@ with tab2:
             lats = np.linspace(lat1, lat2, num_points)
             lons = np.linspace(lon1, lon2, num_points)
 
-            fig.add_trace(go.Scattermapbox(
+            fig.add_trace(go.Scattermap(
                 mode="lines",
                 lon=lons,
                 lat=lats,
@@ -290,7 +290,7 @@ with tab2:
             map_df[["Destination", "Destination_Lat", "Destination_Lon"]].rename(columns={"Destination": "Airport", "Destination_Lat": "Lat", "Destination_Lon": "Lon"})
         ]).drop_duplicates()
 
-        fig.add_trace(go.Scattermapbox(
+        fig.add_trace(go.Scattermap(
             mode="markers",
             lat=bubble_df["Lat"],
             lon=bubble_df["Lon"],
