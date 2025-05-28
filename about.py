@@ -19,6 +19,15 @@ This streamlit implementation by **Larry** builds on that foundation, expanding 
 **Webapp Developer**: [Larry Dsouza](https://larry-dsouza.framer.website/)
         """)
 
+col1, col2 = st.columns([0.1, 1])
+with col1:
+    st.badge(
+        "Disclaimer:",
+        color="red"
+    )
+with col2: 
+    st.caption("This Streamlit app is a conversion of the original Excel-based tool. While I developed the app interface and logic, I have not independently verified the emission factors or calculation methodology. Please consult the original tool for reference. The app has been tested to ensure that results match those produced by the original Excel tool.")
+
 with st.popover("View Larry's contributions"):
     st.markdown("""
 - Integrated flight and emissions data from the original Excel file, including airport coordinates and class-based emission factors.
