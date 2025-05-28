@@ -5,6 +5,7 @@ import math
 import altair as alt
 import plotly.graph_objects as go
 import numpy as np
+import plotly.express as px
 
 
 avarni_file_path = Path(__file__).parent / "data" / "Avarni_Flight-Distance-Emissions-Calculator.xlsm"
@@ -251,41 +252,45 @@ with tab2:
         # Prepare cleaned data
         map_df = df.dropna(subset=["Origin_Lat", "Origin_Lon", "Destination_Lat", "Destination_Lon", "Emissions"]).copy()
 
-        # Normalize emissions for line width scaling (optional)
+        # Normalize emissions for line width scaling
         emissions_norm = (map_df["Emissions"] - map_df["Emissions"].min()) / (map_df["Emissions"].max() - map_df["Emissions"].min())
         map_df["Line_Width"] = emissions_norm * 5 + 1  # line width between 1–6
+
+        # Create a color mapping for each unique origin
+        unique_origins = map_df["Origin"].unique()
+        color_palette = px.colors.qualitative.Plotly  # You can change to Dark24, Bold, etc.
+        color_map = {origin: color_palette[i % len(color_palette)] for i, origin in enumerate(unique_origins)}
 
         # Initialize figure
         fig = go.Figure()
 
-        # Add each flight route as a curved great circle line
+        # Add each flight route with color based on origin
         for _, row in map_df.iterrows():
             lat1, lon1 = row["Origin_Lat"], row["Origin_Lon"]
             lat2, lon2 = row["Destination_Lat"], row["Destination_Lon"]
 
-            # interpolate lat/lon points along great circle
+            # Interpolate great circle path
             num_points = 20
             lats = np.linspace(lat1, lat2, num_points)
             lons = np.linspace(lon1, lon2, num_points)
 
-            fig.add_trace(go.Scattermap(
+            fig.add_trace(go.Scattermapbox(
                 mode="lines",
                 lon=lons,
                 lat=lats,
-                line=dict(width=row["Line_Width"], color="red"),
+                line=dict(width=row["Line_Width"], color=color_map[row["Origin"]]),
                 hoverinfo="text",
                 text=f"{row['Origin']} ➝ {row['Destination']}<br>{row['Emissions']:.2f} kg CO₂e",
-                name=""
+                name=""  # Optional: could use row["Origin"] to show in legend
             ))
 
-        # Add airport bubbles (optional)
+        # Add airport markers
         bubble_df = pd.concat([
             map_df[["Origin", "Origin_Lat", "Origin_Lon"]].rename(columns={"Origin": "Airport", "Origin_Lat": "Lat", "Origin_Lon": "Lon"}),
             map_df[["Destination", "Destination_Lat", "Destination_Lon"]].rename(columns={"Destination": "Airport", "Destination_Lat": "Lat", "Destination_Lon": "Lon"})
-        ])
-        bubble_df = bubble_df.drop_duplicates()
+        ]).drop_duplicates()
 
-        fig.add_trace(go.Scattermap(
+        fig.add_trace(go.Scattermapbox(
             mode="markers",
             lat=bubble_df["Lat"],
             lon=bubble_df["Lon"],
@@ -295,7 +300,7 @@ with tab2:
             name="Airports"
         ))
 
-        # Layout with modern basemap
+        # Final map layout
         fig.update_layout(
             mapbox=dict(
                 style="carto-positron",
@@ -304,7 +309,7 @@ with tab2:
             ),
             margin={"r": 0, "t": 0, "l": 0, "b": 0},
             height=600,
-            showlegend=False
+            showlegend=False  # Change to True and set trace names if you want a legend
         )
 
         st.plotly_chart(fig, use_container_width=True)
